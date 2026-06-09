@@ -1,0 +1,22 @@
+[
+  {
+    "model": "gpt-4o",
+    "usage": {
+      "prompt_tokens": 5000,
+      "completion_tokens": 50,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  },
+  {
+    "model": "gpt-4o",
+    "usage": {
+      "prompt_tokens": 5350,
+      "completion_tokens": 70,
+      "prompt_tokens_details": {
+        "cached_tokens": 4800
+      }
+    }
+  }
+]
