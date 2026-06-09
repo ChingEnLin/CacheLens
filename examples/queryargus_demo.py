@@ -1,14 +1,16 @@
-"""End-to-end demo wrapping a QueryArgus Gemini client.
+"""End-to-end demo wrapping a QueryArgus-style google-genai client.
 
-Run from a checkout where QueryArgus is importable, e.g.:
+Run:
     pip install cache-lens[gemini]
-    python examples/queryargus_demo.py --collection users
+    GEMINI_API_KEY=... python examples/queryargus_demo.py --collection users
 
-The only integration point is wrapping the GenerativeModel; QueryArgus runs
-unchanged. See SPEC.md §9.4.
+The only integration point is wrapping genai.Client; in QueryArgus itself
+this is one line in GeminiClient.__init__:
+    self._client = wrap(genai.Client(api_key=api_key))
 """
 
 import argparse
+import os
 
 from cache_lens import CacheLens
 
@@ -21,19 +23,26 @@ def main() -> None:
     parser.add_argument("--otel", action="store_true")
     args = parser.parse_args()
 
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types as genai_types
 
-    model = genai.GenerativeModel(args.model)
+    raw_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-    with CacheLens(model, json_export=args.json_export, otel=args.otel) as client:
-        # Stand-in for the QueryArgus ReAct loop. Replace with:
-        #   from queryargus.agent import ReActAgent
-        #   ReActAgent(client).run(connection, args.collection)
+    with CacheLens(raw_client, json_export=args.json_export, otel=args.otel) as client:
+        # Stand-in for the QueryArgus ReAct loop.
         system = "You are QueryArgus, a Cosmos DB query agent.\n" + ("schema context " * 500)
-        history = system
+        config = genai_types.GenerateContentConfig(
+            system_instruction=system,
+            response_mime_type="application/json",
+        )
+        history = ""
         for i in range(20):
             history += f"\nIteration {i}: tool result for {args.collection}"
-            client.generate_content(history)
+            client.models.generate_content(
+                model=args.model,
+                contents=history,
+                config=config,
+            )
 
 
 if __name__ == "__main__":

@@ -14,7 +14,18 @@ def capture(args: tuple, kwargs: dict, *, model: str, client: object) -> List[Pr
 
     segments: List[PromptSegment] = []
 
-    si = getattr(client, "_system_instruction", None) or getattr(client, "system_instruction", None)
+    # New google-genai SDK passes the system prompt in the per-call config;
+    # the legacy google-generativeai SDK stores it on the model object.
+    config = kwargs.get("config")
+    if isinstance(config, dict):
+        si = config.get("system_instruction")
+    else:
+        si = getattr(config, "system_instruction", None)
+    si = (
+        si
+        or getattr(client, "_system_instruction", None)
+        or getattr(client, "system_instruction", None)
+    )
     if si:
         text = text_of(si)
         if text:

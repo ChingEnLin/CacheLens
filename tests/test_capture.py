@@ -47,6 +47,31 @@ def test_gemini_capture_system_instruction_and_contents():
     assert segs[1].text == "just a string prompt"
 
 
+def test_gemini_capture_system_instruction_from_config_kwarg():
+    # New google-genai SDK: system prompt travels in config, not on the client.
+    config = SimpleNamespace(system_instruction="be terse")
+    segs = _gemini.capture(
+        (),
+        {"contents": "just a string prompt", "config": config},
+        model="gemini-2.5-flash",
+        client=SimpleNamespace(),
+    )
+    assert segs[0].role == "system"
+    assert segs[0].text == "be terse"
+    assert segs[1].text == "just a string prompt"
+
+
+def test_gemini_capture_system_instruction_from_config_dict():
+    segs = _gemini.capture(
+        (),
+        {"contents": "q", "config": {"system_instruction": "be terse"}},
+        model="gemini-2.5-flash",
+        client=SimpleNamespace(),
+    )
+    assert segs[0].role == "system"
+    assert segs[0].text == "be terse"
+
+
 def test_gemini_capture_contents_list_of_dicts():
     segs = _gemini.capture(
         (),
