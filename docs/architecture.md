@@ -27,7 +27,11 @@ Two cases get special handling:
 ## Layer classification (content-based)
 
 The wrapper captures each call's **request prompt** (not just the response) and
-normalises it to ordered `PromptSegment`s. The analyzer computes the longest
+normalises it to ordered `PromptSegment`s. Capture is content-free by default:
+each segment is reduced to *(role, SHA-256 hash, char length)* at intercept
+time — equality and length are all the prefix diff and char-share estimation
+need — so prompt text never accumulates in process memory
+(`capture_content=True` opts into retaining full text). The analyzer computes the longest
 common prefix of segments across all calls (the cacheable region), names the
 layers within it (`system_prompt` / `context` / `conversation`), and
 cross-references that content-derived prefix against the `cache_read` tokens the
