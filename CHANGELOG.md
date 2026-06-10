@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v1.0.3 (2026-06-10)
+
+### Bug Fixes
+
+- Stop semantic-release from pre-building dist/ before CI build
+  ([`46a9a87`](https://github.com/ChingEnLin/CacheLens/commit/46a9a874e2292432790cd975dc90bc1b2ca59514))
+
+semantic-release's build_command ran inside its container and wrote dist/*.tar.gz as root, causing a
+  permission error when the workflow's own build step tried to overwrite it. The workflow already
+  builds and publishes the package itself, so this command is unnecessary. Also restore v1.0.0
+  changelog details dropped by the earlier release.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v1.0.2 (2026-06-10)
 
 ### Bug Fixes
@@ -31,15 +46,4 @@ Pin python-semantic-release, upload-to-gh-release, and gh-action-pypi-publish to
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 
-## v1.0.0 (2026-06-09)
-
-### Added
-
-- Wrapper interception for Anthropic, Gemini, and OpenAI clients (`wrap`, `CacheLens`, `CacheLensClient`)
-- Request capture: normalises prompt to ordered `PromptSegment` list per call
-- Content-based layer classification via longest-common-prefix analysis (system_prompt / context / conversation layers)
-- Terminal report with cache hit rate, cost, savings, and per-layer breakdown
-- JSON export (`json_export=` arg or `CACHE_LENS_JSON` env var)
-- OpenTelemetry metrics output (`otel=True`)
-- Overridable pricing table (native dict, JSON file, or `CACHE_LENS_PRICING` env var; LiteLLM format auto-detected)
-- Gemini support for modern `google-genai` SDK (`config` kwarg pattern)
+## v1.0.0 (2026-06-10)
