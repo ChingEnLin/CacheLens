@@ -21,18 +21,27 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Callable, Dict, List, Optional
 
 from . import pricing
-from .models import CallCapture, LayerReport, RawCallMetrics, SessionReport
+from .models import CallCapture, LayerReport, LayerType, RawCallMetrics, SessionReport
+
+RateFn = Callable[[str, str, str], float]
 
 
-def analyze(captures: List[CallCapture], session_id: str = "") -> SessionReport:
+def analyze(
+    captures: List[CallCapture],
+    session_id: str = "",
+    *,
+    registry: Optional[pricing.Registry] = None,
+    skipped_calls: int = 0,
+) -> SessionReport:
     session_id = session_id or str(uuid.uuid4())
     now = datetime.now(timezone.utc)
+    rate: RateFn = registry.rate if registry is not None else pricing.rate
 
     if not captures:
-        return SessionReport(
+        report = SessionReport(
             session_id=session_id,
             provider="",
             model="",
@@ -40,30 +49,36 @@ def analyze(captures: List[CallCapture], session_id: str = "") -> SessionReport:
             ended_at=now,
             total_calls=0,
             total_turns=0,
+            skipped_calls=skipped_calls,
         )
+        if skipped_calls:
+            report.tips = [_skipped_tip(skipped_calls)]
+        return report
 
     metrics = [c.metrics for c in captures]
     provider = metrics[0].provider
     model = metrics[0].model
+    models = list(dict.fromkeys(m.model for m in metrics))
 
     total_input = sum(m.input_tokens for m in metrics)
     total_output = sum(m.output_tokens for m in metrics)
     total_cached = sum(m.cache_read_tokens for m in metrics)
     total_miss = sum(m.cache_miss_tokens for m in metrics)
 
-    actual_cost = _actual_cost(metrics)
-    cold_cost = _cold_cost(metrics)
+    actual_cost = _actual_cost(metrics, rate)
+    cold_cost = _cold_cost(metrics, rate)
     savings = max(cold_cost - actual_cost, 0.0)
     overall_hit_rate = (total_cached / total_input) if total_input else 0.0
 
-    layers, prefix_len, prefix_per_call_tokens = _classify_layers(captures, provider, model)
+    layers, prefix_len, prefix_per_call_tokens = _classify_layers(captures, provider, model, rate)
 
-    input_rate = pricing.rate(provider, model, "input")
-    read_rate = pricing.rate(provider, model, "cache_read")
+    input_rate = rate(provider, model, "input")
+    read_rate = rate(provider, model, "cache_read")
     theoretical_max = max(
         prefix_per_call_tokens * (len(captures) - 1) * (input_rate - read_rate), 0.0
     )
 
+    latencies = [m.latency_ms for m in metrics]
     report = SessionReport(
         session_id=session_id,
         provider=provider,
@@ -81,27 +96,46 @@ def analyze(captures: List[CallCapture], session_id: str = "") -> SessionReport:
         cold_cost_usd=round(cold_cost, 6),
         total_savings_usd=round(savings, 6),
         theoretical_max_savings_usd=round(theoretical_max, 6),
+        models=models,
+        skipped_calls=skipped_calls,
+        latency_p50_ms=_percentile(latencies, 0.5),
+        latency_p95_ms=_percentile(latencies, 0.95),
     )
     report.tips = _build_tips(report, captures, layers, prefix_len, total_miss)
     return report
 
 
-def _actual_cost(metrics: List[RawCallMetrics]) -> float:
+def _percentile(values: List[int], q: float) -> int:
+    if not values:
+        return 0
+    ordered = sorted(values)
+    idx = min(int(round(q * (len(ordered) - 1))), len(ordered) - 1)
+    return ordered[idx]
+
+
+def _skipped_tip(skipped: int) -> str:
+    return (
+        f"{skipped} call(s) were not instrumented (streaming responses are not "
+        "yet supported) — their tokens and cost are missing from this report."
+    )
+
+
+def _actual_cost(metrics: List[RawCallMetrics], rate: RateFn) -> float:
     cost = 0.0
     for m in metrics:
-        cost += m.cache_miss_tokens * pricing.rate(m.provider, m.model, "input")
-        cost += m.cache_creation_tokens * pricing.rate(m.provider, m.model, "cache_write")
-        cost += m.cache_read_tokens * pricing.rate(m.provider, m.model, "cache_read")
-        cost += m.output_tokens * pricing.rate(m.provider, m.model, "output")
+        cost += m.cache_miss_tokens * rate(m.provider, m.model, "input")
+        cost += m.cache_creation_tokens * rate(m.provider, m.model, "cache_write")
+        cost += m.cache_read_tokens * rate(m.provider, m.model, "cache_read")
+        cost += m.output_tokens * rate(m.provider, m.model, "output")
     return cost
 
 
-def _cold_cost(metrics: List[RawCallMetrics]) -> float:
+def _cold_cost(metrics: List[RawCallMetrics], rate: RateFn) -> float:
     """Cost if every input token were billed at the full input rate."""
     cost = 0.0
     for m in metrics:
-        cost += m.input_tokens * pricing.rate(m.provider, m.model, "input")
-        cost += m.output_tokens * pricing.rate(m.provider, m.model, "output")
+        cost += m.input_tokens * rate(m.provider, m.model, "input")
+        cost += m.output_tokens * rate(m.provider, m.model, "output")
     return cost
 
 
@@ -115,7 +149,8 @@ def _common_prefix_len(captures: List[CallCapture]) -> int:
     for i in range(shortest):
         first = seq_lists[0][i]
         if all(
-            s[i].role == first.role and s[i].text == first.text for s in seq_lists
+            s[i].role == first.role and s[i].text_hash == first.text_hash
+            for s in seq_lists
         ):
             n += 1
         else:
@@ -123,20 +158,20 @@ def _common_prefix_len(captures: List[CallCapture]) -> int:
     return n
 
 
-def _classify_layers(captures: List[CallCapture], provider: str, model: str):
+def _classify_layers(captures: List[CallCapture], provider: str, model: str, rate: RateFn):
     """Return (layers, prefix_len, prefix_tokens_per_call)."""
     prefix_len = _common_prefix_len(captures)
 
     sys_tok = ctx_tok = conv_tok = 0.0
     for cap in captures:
         segs = cap.segments
-        total_chars = sum(len(s.text) for s in segs)
+        total_chars = sum(s.length for s in segs)
         if total_chars <= 0:
             # No capturable content — attribute everything to the dynamic layer.
             conv_tok += cap.metrics.input_tokens
             continue
         for i, seg in enumerate(segs):
-            tok = cap.metrics.input_tokens * (len(seg.text) / total_chars)
+            tok = cap.metrics.input_tokens * (seg.length / total_chars)
             if i < prefix_len:
                 if seg.role == "system":
                     sys_tok += tok
@@ -153,10 +188,10 @@ def _classify_layers(captures: List[CallCapture], provider: str, model: str):
     sys_cached = cached_in_prefix * (sys_tok / prefix_tok) if prefix_tok else 0.0
     ctx_cached = cached_in_prefix - sys_cached
 
-    input_rate = pricing.rate(provider, model, "input")
-    read_rate = pricing.rate(provider, model, "cache_read")
+    input_rate = rate(provider, model, "input")
+    read_rate = rate(provider, model, "cache_read")
 
-    def make(name: str, layer_type: str, total: float, cached: float) -> LayerReport:
+    def make(name: str, layer_type: LayerType, total: float, cached: float) -> LayerReport:
         cached = min(cached, total)
         cold = total * input_rate
         actual = cached * read_rate + (total - cached) * input_rate
@@ -188,11 +223,11 @@ def _prefix_tokens_per_call(captures: List[CallCapture], prefix_len: int) -> flo
     if not captures or prefix_len <= 0:
         return 0.0
     cap = captures[0]
-    total_chars = sum(len(s.text) for s in cap.segments)
+    total_chars = sum(s.length for s in cap.segments)
     if total_chars <= 0:
         return 0.0
     return sum(
-        cap.metrics.input_tokens * (len(cap.segments[i].text) / total_chars)
+        cap.metrics.input_tokens * (cap.segments[i].length / total_chars)
         for i in range(prefix_len)
     )
 
@@ -249,6 +284,15 @@ def _build_tips(
             f"{total_miss / report.total_input_tokens:.0%} of input tokens are "
             "uncached and re-sent each turn — consider summarising tool results "
             "instead of appending them verbatim."
+        )
+
+    if report.skipped_calls:
+        tips.append(_skipped_tip(report.skipped_calls))
+
+    if len(report.models) > 1:
+        tips.append(
+            f"Session mixed {len(report.models)} models ({', '.join(report.models)}) — "
+            "layer costs use the first model's rates; per-call aggregates are exact."
         )
 
     return tips

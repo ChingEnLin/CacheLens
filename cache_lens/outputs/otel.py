@@ -10,11 +10,13 @@ from ..models import SessionReport
 def emit(report: SessionReport) -> None:
     """Emit cache-lens instruments via the OTEL SDK.
 
-    Falls back to the console exporter if no OTLP endpoint is configured.
-    Silently no-ops if the OTEL SDK is not installed.
+    Uses a private MeterProvider — never touches the process-global one, so a
+    host app's own OpenTelemetry setup is left intact (and vice versa). Falls
+    back to the console exporter if no OTLP endpoint is configured. Silently
+    no-ops if the OTEL SDK is not installed. Requires opentelemetry-sdk>=1.23
+    (synchronous Gauge support).
     """
     try:
-        from opentelemetry import metrics
         from opentelemetry.sdk.metrics import MeterProvider
         from opentelemetry.sdk.metrics.export import (
             ConsoleMetricExporter,
@@ -26,8 +28,7 @@ def emit(report: SessionReport) -> None:
     exporter = _build_exporter(ConsoleMetricExporter)
     reader = PeriodicExportingMetricReader(exporter)
     provider = MeterProvider(metric_readers=[reader])
-    metrics.set_meter_provider(provider)
-    meter = metrics.get_meter("cache_lens")
+    meter = provider.get_meter("cache_lens")
 
     attrs = {"provider": report.provider, "model": report.model}
 
@@ -52,6 +53,7 @@ def emit(report: SessionReport) -> None:
         tokens_cached.add(layer.cached_tokens, layer_attrs)
 
     provider.force_flush()
+    provider.shutdown()
 
 
 def _build_exporter(console_cls):

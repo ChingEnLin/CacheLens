@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import string
 import sys
 from datetime import datetime
+from typing import Mapping
 
 from ..models import SessionReport
 
@@ -24,6 +26,23 @@ def to_json(report: SessionReport) -> str:
     return json.dumps(to_dict(report), default=_default, indent=2)
 
 
+def _render_path(template: str, values: Mapping[str, str]) -> str:
+    """Substitute whitelisted tokens only — no attribute/index access.
+
+    ``str.format`` would allow ``{model.__class__}``-style traversal; this
+    accepts exactly the documented token names and nothing else.
+    """
+    out = []
+    for literal, field, _spec, _conv in string.Formatter().parse(template):
+        out.append(literal)
+        if field is None:
+            continue
+        if field not in values:
+            raise ValueError(f"unsupported path token: {{{field}}}")
+        out.append(values[field])
+    return "".join(out)
+
+
 def export(report: SessionReport, target: str) -> None:
     """Write the report. `target` may be a path template or "-" for stdout.
 
@@ -34,10 +53,14 @@ def export(report: SessionReport, target: str) -> None:
         sys.stdout.write(payload + "\n")
         return
 
-    path = target.format(
-        timestamp=report.ended_at.strftime("%Y%m%dT%H%M%S"),
-        session_id=report.session_id,
-        model=report.model.replace("/", "_"),
+    safe_model = report.model.replace("/", "_").replace("\\", "_")
+    path = _render_path(
+        target,
+        {
+            "timestamp": report.ended_at.strftime("%Y%m%dT%H%M%S"),
+            "session_id": report.session_id,
+            "model": safe_model,
+        },
     )
     import os
 

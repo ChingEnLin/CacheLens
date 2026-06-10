@@ -67,3 +67,30 @@ def test_rate_uses_overridden_registry():
     pricing.load({"openai": {"gpt-4o": {"input": 2_000_000.0}}})
     # 2_000_000 USD / 1M tokens == 2.0 USD per token
     assert pricing.rate("openai", "gpt-4o", "input") == 2.0
+
+
+def test_registry_isolated_from_module():
+    registry = pricing.Registry()
+    registry.load({"openai": {"gpt-4o": {"input": 50.0}}})
+
+    assert registry.get_pricing("openai", "gpt-4o")["input"] == 50.0
+    # Module-level table untouched by the per-session override.
+    assert pricing.get_pricing("openai", "gpt-4o")["input"] == 2.50
+
+
+def test_registry_snapshots_module_overrides():
+    pricing.load({"openai": {"gpt-x": {"input": 9.0}}})
+    registry = pricing.Registry()
+    assert registry.get_pricing("openai", "gpt-x")["input"] == 9.0
+
+
+def test_registry_replace_mode():
+    registry = pricing.Registry()
+    registry.load({"openai": {"gpt-9": {"input": 1.0}}}, merge=False)
+    assert registry.get_pricing("openai", "gpt-4o") is None
+    assert registry.get_pricing("openai", "gpt-9")["input"] == 1.0
+
+
+def test_registry_prefix_match():
+    registry = pricing.Registry()
+    assert registry.rate("openai", "gpt-4o-2026-01-01", "input") == 2.50 / 1_000_000

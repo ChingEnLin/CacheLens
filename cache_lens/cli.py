@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import sys
+from typing import List, Optional
 
 
-def main(argv: list = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     if not argv or argv[0] in ("-h", "--help"):
         _print_usage()
@@ -20,22 +21,26 @@ def main(argv: list = None) -> int:
     return 2
 
 
-def _run(command: list) -> int:
+def _run(command: List[str]) -> int:
     if not command:
         sys.stderr.write("cache-lens run: no command given\n")
         return 2
-    # v1.0: sitecustomize injection that patches the SDK at import time and
-    # registers an atexit report. Implementation tracked in docs/architecture.md.
-    raise NotImplementedError(
-        "cache-lens run is scaffolded; sitecustomize injection not yet implemented"
+    # Planned: sitecustomize injection that patches the SDK at import time and
+    # registers an atexit report. Design tracked in docs/architecture.md.
+    sys.stderr.write(
+        "cache-lens run is not implemented yet — wrap your client in code instead:\n"
+        "  from cache_lens import wrap; client = wrap(client)\n"
+        "Track progress: https://github.com/ChingEnLin/CacheLens/issues\n"
     )
+    return 2
 
 
 def _print_usage() -> None:
     sys.stdout.write(
         "cache-lens — prompt cache instrumentation\n\n"
         "Usage:\n"
-        "  cache-lens run <command> [args...]   Instrument a subprocess\n"
+        "  cache-lens run <command> [args...]   Instrument a subprocess (experimental,\n"
+        "                                       not yet implemented)\n"
     )
 
 
