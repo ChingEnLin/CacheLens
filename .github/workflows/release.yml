@@ -15,6 +15,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: github.repository == 'ChingEnLin/CacheLens'
+    environment: pypi
+    permissions:
+      contents: write
+      id-token: write # required for PyPI trusted publishing
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,9 +31,16 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish build artifacts to GitHub Release
-        uses: python-semantic-release/upload-to-gh-release@0a92b5d7ebfc15a84f9801ebd1bf706343d43711 # main
+      - name: Set up Python
         if: steps.release.outputs.released == 'true'
+        uses: actions/setup-python@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.release.outputs.tag }}
+          python-version: "3.12"
+
+      - name: Build sdist and wheel
+        if: steps.release.outputs.released == 'true'
+        run: pip install build && python -m build
+
+      - name: Publish to PyPI
+        if: steps.release.outputs.released == 'true'
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
