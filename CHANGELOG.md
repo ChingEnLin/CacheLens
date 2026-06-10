@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.0.4 (2026-06-10)
+
+### Bug Fixes
+
+- Enable verbose output for PyPI publish step
+  ([`ce84b90`](https://github.com/ChingEnLin/CacheLens/commit/ce84b90150133aa8e3e947d10dfaaa34319613b7))
+
+Restore v1.0.0 changelog details dropped by the earlier release misfires, and turn on verbose
+  logging in the PyPI publish step for easier troubleshooting.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v1.0.3 (2026-06-10)
 
 ### Bug Fixes
@@ -46,15 +59,4 @@ Pin python-semantic-release, upload-to-gh-release, and gh-action-pypi-publish to
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 
-## v1.0.0 (2026-06-09)
-
-### Added
-
-- Wrapper interception for Anthropic, Gemini, and OpenAI clients (`wrap`, `CacheLens`, `CacheLensClient`)
-- Request capture: normalises prompt to ordered `PromptSegment` list per call
-- Content-based layer classification via longest-common-prefix analysis (system_prompt / context / conversation layers)
-- Terminal report with cache hit rate, cost, savings, and per-layer breakdown
-- JSON export (`json_export=` arg or `CACHE_LENS_JSON` env var)
-- OpenTelemetry metrics output (`otel=True`)
-- Overridable pricing table (native dict, JSON file, or `CACHE_LENS_PRICING` env var; LiteLLM format auto-detected)
-- Gemini support for modern `google-genai` SDK (`config` kwarg pattern)
+## v1.0.0 (2026-06-10)
