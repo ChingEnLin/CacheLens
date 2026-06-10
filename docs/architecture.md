@@ -1,6 +1,4 @@
-# cache-lens architecture
-
-Expanded notes complementing [SPEC.md](../SPEC.md).
+# CacheLens architecture
 
 ## Module map
 
@@ -34,11 +32,20 @@ common prefix of segments across all calls (the cacheable region), names the
 layers within it (`system_prompt` / `context` / `conversation`), and
 cross-references that content-derived prefix against the `cache_read` tokens the
 provider actually reported — surfacing which named layer is stable-but-uncached
-and what it costs. See SPEC §6 for the full algorithm and the per-layer token
-estimation method.
+and what it costs.
+
+The longest common prefix is computed across every call's segments in a
+session; segments within that prefix are grouped into named layers
+(`system_prompt`, `context`, `conversation`) by role/position heuristics, and
+any segments after the prefix diverges fall into a trailing `conversation`
+layer. Overall session aggregates (cost, savings, hit rate) are computed
+**exactly** from the response metrics, but the per-layer token split is
+**estimated**: each layer's character share of the prefix is scaled against
+the real `input_tokens` reported for that call, since CacheLens has no
+tokenizer dependency.
 
 This is the project's differentiator (see [positioning.md](positioning.md)):
-metric-only tools know *how many* tokens were cached; cache-lens knows *which
+metric-only tools know *how many* tokens were cached; CacheLens knows *which
 layer* should have been and wasn't.
 
 **Deferred:** true static vs semi-static separation needs cross-run comparison

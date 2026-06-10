@@ -1,24 +1,24 @@
-# cache-lens
+# CacheLens
 
 > Non-invasive prompt cache instrumentation for LLM API apps.
 > Wrap your client in one line. Get terminal reports, JSON exports, and OTEL metrics.
 
 Prompt caching gives steep discounts on cached tokens — but nothing tells you
-whether your app is actually getting cache hits, or why not. cache-lens wraps
+whether your app is actually getting cache hits, or why not. CacheLens wraps
 your Anthropic, Gemini, or OpenAI client and reports cache hit rate, cost,
 savings, and the money you're leaving on the table, broken down by prompt layer.
 
-See [SPEC.md](SPEC.md) for the full design.
+See [docs/architecture.md](docs/architecture.md) for the full design.
 
 ## Install
 
 ```bash
-pip install cache-lens                # core + rich
-pip install cache-lens[anthropic]     # + Anthropic SDK
-pip install cache-lens[gemini]        # + Gemini SDK
-pip install cache-lens[openai]        # + OpenAI SDK
-pip install cache-lens[otel]          # + OpenTelemetry
-pip install cache-lens[all]           # everything
+pip install cachelens                # core + rich
+pip install cachelens[anthropic]     # + Anthropic SDK
+pip install cachelens[gemini]        # + Gemini SDK
+pip install cachelens[openai]        # + OpenAI SDK
+pip install cachelens[otel]          # + OpenTelemetry
+pip install cachelens[all]           # everything
 ```
 
 ## Quickstart
@@ -45,7 +45,7 @@ Suppress the terminal report in CI with `CACHE_LENS_TERMINAL=0`.
 
 ## Custom pricing
 
-cache-lens ships a default price table, but you can override or extend it without
+CacheLens ships a default price table, but you can override or extend it without
 forking — handy when a new model lands. User entries merge over the defaults:
 
 ```python
@@ -58,7 +58,36 @@ wrap(client, pricing="pricing.json")
 
 Or point at a file process-wide with `CACHE_LENS_PRICING=/path/to/pricing.json`.
 A bad pricing file falls back to defaults rather than breaking the run. See
-[SPEC.md §12](SPEC.md#12-pricing-table).
+[docs/architecture.md](docs/architecture.md) for the full design.
+
+## How this helps you develop LLM applications
+
+Prompt caching only pays off if your prompt's prefix is stable and
+byte-identical across calls — but most agent loops accumulate per-turn state
+(timestamps, counters, mutating progress trackers) that silently breaks the
+prefix without anyone noticing. The API still works fine, the bill just stays
+high. CacheLens turns that invisible problem into a concrete, iterable
+workflow during development:
+
+1. **Wrap your client once** and run your normal dev/test loop — no changes
+   to your app logic required.
+2. **Read the layer table** to see whether your prompt is actually splitting
+   into stable layers (system prompt, schema/context, conversation) or
+   collapsing into one big `conversation` blob — the latter is a strong
+   signal that something near the top of your prompt changes every turn.
+3. **Use the tips as a diagnosis, not just a metric.** "No stable prompt
+   prefix detected" tells you *why* your hit rate is 0% and what to fix
+   (move static content first, make it byte-identical); "X% of input tokens
+   are uncached" tells you how much headroom restructuring is worth before
+   you spend time on it.
+4. **Re-run after each change** and compare `Savings`, `Cached`/`Hit Rate`,
+   and whether the tips changed — this is the feedback loop that tells you
+   whether a refactor (e.g. splitting prompt-building into a stable prefix
+   and a volatile trailer) actually moved the needle, before you ever look at
+   a billing dashboard.
+
+See [examples/queryargus.md](examples/queryargus.md) for a real before/after
+walkthrough of this loop on a 30-turn Gemini agent.
 
 ## Status
 

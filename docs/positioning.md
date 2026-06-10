@@ -1,14 +1,14 @@
-# cache-lens — positioning & competitive analysis
+# CacheLens — positioning & competitive analysis
 
-> Why cache-lens exists alongside the existing prompt-caching tooling, and where
-> the genuine whitespace is. Researched 2026-06-09.
+> Why CacheLens exists alongside the existing prompt-caching tooling, and where
+> the genuine whitespace is. Last reviewed 2026-06-09.
 
 ## One-line thesis
 
 Every existing tool surfaces the cached-token *number*. None do the
 **architectural diagnostic** — cross-call prefix-stability analysis that tells
 you *which layer of your prompt is cacheable but isn't*, what it's costing you,
-and how to restructure. That diagnostic is cache-lens's identity and it is
+and how to restructure. That diagnostic is CacheLens's identity and it is
 currently unoccupied.
 
 ## The landscape
@@ -29,12 +29,13 @@ The *diagnostic interpretation* of that count is not.
 
 LiteLLM is the most important neighbour because it touches two adjacent jobs.
 
-### 1. Cache hit rate — already done (do not contribute)
+### 1. Cache hit rate — already solved by LiteLLM
 
 LiteLLM ships per-call cached-token counters and a documented PromQL ratio
 (`rate(litellm_input_cached_tokens_metric_total) / rate(litellm_input_tokens_metric_total)`),
-plus cache-aware cost math in `completion_cost()`. Proposing a "cache hit rate"
-metric upstream would be redundant.
+plus cache-aware cost math in `completion_cost()`. CacheLens doesn't try to
+re-do this — a "cache hit rate" metric would be redundant with what LiteLLM
+already provides.
 
 ### 2. Auto-inject checkpoints — the "fix", but blind
 
@@ -66,10 +67,10 @@ which moves every turn in a growing conversation — almost always the wrong tar
 for a static prefix. (See also bug #15696: it once stamped all content blocks
 instead of the last — mechanically young.)
 
-## Where that leaves cache-lens
+## Where that leaves CacheLens
 
-cache-lens is the **eyes**; LiteLLM's auto-inject is the **hands**. The exact
-output cache-lens produces —
+CacheLens is the **eyes**; LiteLLM's auto-inject is the **hands**. The exact
+output CacheLens produces —
 
 > "system_prompt + schema_context are static across 18 turns, uncached, costing
 > $0.14 — move them to a cache_control block before the conversation history"
@@ -78,24 +79,24 @@ output cache-lens produces —
 `cache_control_injection_points` correctly (or to add `cache_control` by hand).
 Without a diagnostic layer, configuring their injector is guesswork.
 
-cache-lens already consumes LiteLLM's `model_prices_and_context_window.json`
-pricing format (see [SPEC.md §12](../SPEC.md#12-pricing-table)), so it is an
-ecosystem citizen, not a competitor.
+CacheLens already consumes LiteLLM's `model_prices_and_context_window.json`
+pricing format (see `cache_lens/pricing.py`), so it is an ecosystem citizen,
+not a competitor.
 
-## Contribution decision
+## Where each idea belongs
 
-| Idea | Verdict |
+| Idea | Where it belongs |
 |------|---------|
-| Cache hit rate metric → LiteLLM | Skip — already exists |
-| Diagnostics into auto-inject hook | Skip — it's a thin mutator by design |
-| Pricing-data fixes → LiteLLM JSON | Do — clean, welcome upstream contribution |
-| Layer classification / ceiling / tips | Keep as cache-lens — no tool does it |
+| Cache hit rate metric | LiteLLM — already exists, no need to duplicate |
+| Diagnostics inside the auto-inject hook | Not a fit — it's a thin mutator by design, not an analysis layer |
+| Pricing-data fixes | Upstream to LiteLLM's JSON — clean, welcome contribution |
+| Layer classification / ceiling / tips | CacheLens — no other tool does this |
 
-## Blog beat
+## In short
 
-> "LiteLLM will stamp a cache marker wherever you point it — but pointing
-> correctly requires knowing your prompt's layer structure, and nothing tells you
-> that. cache-lens is the missing eyes."
+LiteLLM will stamp a cache marker wherever you point it — but pointing
+correctly requires knowing your prompt's layer structure, and nothing tells
+you that. CacheLens is the missing eyes.
 
 ## Sources
 
