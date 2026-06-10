@@ -52,10 +52,6 @@ Homepage = "https://github.com/ChingEnLin/CacheLens"
 Repository = "https://github.com/ChingEnLin/CacheLens"
 Issues = "https://github.com/ChingEnLin/CacheLens/issues"
 
-
-
-
-
 [tool.hatch.build.targets.wheel]
 packages = ["cache_lens"]
 
