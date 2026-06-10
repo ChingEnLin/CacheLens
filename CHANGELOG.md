@@ -1,6 +1,30 @@
 # CHANGELOG
 
 
+## v1.0.5 (2026-06-10)
+
+### Bug Fixes
+
+- Drop Python 3.8 support
+  ([`e500d31`](https://github.com/ChingEnLin/CacheLens/commit/e500d31439d8e575c24d47bf1f9310a15be4e063))
+
+google-generativeai (the gemini extra) has no distribution for Python 3.8, so
+  cachelens[gemini]/[all] was already broken there. Python 3.8 is also EOL. Raise requires-python to
+  >=3.9 and update the CI matrix accordingly.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Documentation
+
+- Restore v1.0.0 changelog details and tidy pyproject.toml
+  ([`6a7fa3b`](https://github.com/ChingEnLin/CacheLens/commit/6a7fa3bb43c0b78d09e61e0a2038e955f1ebc856))
+
+The semantic-release version_toml writer drops the v1.0.0 changelog section and accumulates blank
+  lines in pyproject.toml on each run.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v1.0.4 (2026-06-10)
 
 ### Bug Fixes
@@ -59,15 +83,4 @@ Pin python-semantic-release, upload-to-gh-release, and gh-action-pypi-publish to
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 
-## v1.0.0 (2026-06-09)
-
-### Added
-
-- Wrapper interception for Anthropic, Gemini, and OpenAI clients (`wrap`, `CacheLens`, `CacheLensClient`)
-- Request capture: normalises prompt to ordered `PromptSegment` list per call
-- Content-based layer classification via longest-common-prefix analysis (system_prompt / context / conversation layers)
-- Terminal report with cache hit rate, cost, savings, and per-layer breakdown
-- JSON export (`json_export=` arg or `CACHE_LENS_JSON` env var)
-- OpenTelemetry metrics output (`otel=True`)
-- Overridable pricing table (native dict, JSON file, or `CACHE_LENS_PRICING` env var; LiteLLM format auto-detected)
-- Gemini support for modern `google-genai` SDK (`config` kwarg pattern)
+## v1.0.0 (2026-06-10)
