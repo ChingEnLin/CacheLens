@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cachelens"
-version = "0.0.0"
+version = "1.0.0"
 description = "Non-invasive prompt cache instrumentation for LLM API apps"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -52,7 +52,6 @@ cache-lens = "cache_lens.cli:main"
 Homepage = "https://github.com/ChingEnLin/CacheLens"
 Repository = "https://github.com/ChingEnLin/CacheLens"
 Issues = "https://github.com/ChingEnLin/CacheLens/issues"
-
 
 [tool.hatch.build.targets.wheel]
 packages = ["cache_lens"]
