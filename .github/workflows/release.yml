@@ -23,12 +23,12 @@ jobs:
 
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v9
+        uses: python-semantic-release/python-semantic-release@0b9bc98db4143ecf7df57025ad69056fa4f1b2c1 # v9
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish build artifacts to GitHub Release
-        uses: python-semantic-release/upload-to-gh-release@main
+        uses: python-semantic-release/upload-to-gh-release@0a92b5d7ebfc15a84f9801ebd1bf706343d43711 # main
         if: steps.release.outputs.released == 'true'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
