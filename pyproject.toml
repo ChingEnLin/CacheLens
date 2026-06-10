@@ -64,7 +64,6 @@ pythonpath = [".", "tests"]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
-build_command = "pip install build && python -m build"
 branch = "main"
 commit_parser = "conventional"
 major_on_zero = false
