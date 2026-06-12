@@ -2,6 +2,129 @@
 
 <!-- version list -->
 
+## v1.1.0 (2026-06-12)
+
+### Build System
+
+- **deps**: Bump actions/checkout from 4 to 6
+  ([`1752f8f`](https://github.com/ChingEnLin/CacheLens/commit/1752f8f64d6c3e0ebdec57a83c4c920a992783ce))
+
+Bumps [actions/checkout](https://github.com/actions/checkout) from 4 to 6. - [Release
+  notes](https://github.com/actions/checkout/releases) -
+  [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md) -
+  [Commits](https://github.com/actions/checkout/compare/v4...v6)
+
+--- updated-dependencies: - dependency-name: actions/checkout dependency-version: '6'
+
+dependency-type: direct:production
+
+update-type: version-update:semver-major ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+- **deps**: Bump actions/setup-python from 5 to 6
+  ([`75be19d`](https://github.com/ChingEnLin/CacheLens/commit/75be19db449e4b9fee69b9dddf757abff52b9336))
+
+Bumps [actions/setup-python](https://github.com/actions/setup-python) from 5 to 6. - [Release
+  notes](https://github.com/actions/setup-python/releases) -
+  [Commits](https://github.com/actions/setup-python/compare/v5...v6)
+
+--- updated-dependencies: - dependency-name: actions/setup-python dependency-version: '6'
+
+dependency-type: direct:production
+
+update-type: version-update:semver-major ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+- **deps**: Bump python-semantic-release/python-semantic-release
+  ([`a73316b`](https://github.com/ChingEnLin/CacheLens/commit/a73316b4c9e1e32d60863f59ba4f62689a3bf2d4))
+
+Bumps
+  [python-semantic-release/python-semantic-release](https://github.com/python-semantic-release/python-semantic-release)
+  from 0b9bc98db4143ecf7df57025ad69056fa4f1b2c1 to 0dc72ac9058a62054a45f6344c83a423d7f906a8. -
+  [Release notes](https://github.com/python-semantic-release/python-semantic-release/releases) -
+  [Changelog](https://github.com/python-semantic-release/python-semantic-release/blob/master/CHANGELOG.rst)
+  -
+  [Commits](https://github.com/python-semantic-release/python-semantic-release/compare/0b9bc98db4143ecf7df57025ad69056fa4f1b2c1...0dc72ac9058a62054a45f6344c83a423d7f906a8)
+
+--- updated-dependencies: - dependency-name: python-semantic-release/python-semantic-release
+  dependency-version: 0dc72ac9058a62054a45f6344c83a423d7f906a8
+
+dependency-type: direct:production ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+### Continuous Integration
+
+- Gate release on tests; add lint, type-check, and min-versions jobs
+  ([`2a42482`](https://github.com/ChingEnLin/CacheLens/commit/2a42482d05aafc7cf8e454bf0491c9e0430693c9))
+
+The release workflow previously published whenever semantic-release cut a version, regardless of
+  test status. It now needs a green matrix first. CI gains ruff + mypy and a job that installs every
+  extra at its declared minimum version so dependency-floor drift fails in CI instead of on users.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+- Push releases via deploy key to satisfy branch ruleset
+  ([`3568b4a`](https://github.com/ChingEnLin/CacheLens/commit/3568b4a51b4cc54ac2c03e85ee6c1f1ad581071d))
+
+The main ruleset (PRs required, no direct pushes) rejects semantic-release's version-bump push with
+  GITHUB_TOKEN, and the GitHub Actions app cannot be a ruleset bypass actor on a personal repo.
+  Check out the release job with the RELEASE_DEPLOY_KEY secret instead: pushes go over SSH using a
+  write deploy key, which is on the ruleset bypass list — automated releases work again while humans
+  still go through pull requests.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+- Run semantic-release CLI on runner and push via SSH remote
+  ([`c2f51cd`](https://github.com/ChingEnLin/CacheLens/commit/c2f51cd0f3282c19d9af8b6099a69b59d6d5257e))
+
+The PSR docker action rewrites the push URL with GITHUB_TOKEN, so the deploy-key SSH remote from
+  checkout was never used and the main ruleset kept rejecting the version-bump push (GH013). Run the
+  PSR CLI directly on the runner (where checkout's SSH config is visible) and set
+  remote.ignore_token_for_push so the push goes through the deploy-key bypass; the token is still
+  used for the GitHub Release API.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+### Documentation
+
+- Add improvement plan, privacy section, and capture semantics
+  ([`95c219e`](https://github.com/ChingEnLin/CacheLens/commit/95c219e073703ad8e88206cf7bde8a973a2bf75c))
+
+README documents what is captured/retained/exported (content-free by default), session-scoped
+  pricing, async/streaming status, and unwrap(); architecture.md describes hash+length capture;
+  docs/improvement-plan.md records the audit-derived roadmap and what this PR implements.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+### Features
+
+- Harden instrumentation per audit improvement plan
+  ([`e17dca6`](https://github.com/ChingEnLin/CacheLens/commit/e17dca6beb8908432600d6886fac57a38543d086))
+
+Implements the P0-P1 (and P3 hardening) items from docs/improvement-plan.md:
+
+- otel: require opentelemetry-sdk>=1.23 (Meter.create_gauge did not exist on the previously declared
+  1.20 floor and crashed emit()); use a private MeterProvider instead of hijacking the
+  process-global one - wrapper: isolate every output sink in _flush so a sink failure can never
+  reach the caller; async clients (AsyncAnthropic/AsyncOpenAI/ generate_content_async) are now
+  instrumented; streaming calls are counted and surfaced as skipped instead of silently dropped or
+  zero-recorded - capture: content-free by default — segments keep (role, sha256, length) only,
+  bounding memory and keeping prompt text out of the heap; capture_content=True opts back into full
+  text - pricing: per-session Registry so pricing= overrides no longer mutate the process-global
+  table; module-level API unchanged - report: latency p50/p95, distinct-models list with mixed-model
+  tip, skipped_calls accounting - json export: whitelisted path-template substitution (rejects
+  {model.__class__}-style traversal), backslash sanitised in model names - proxy: functools.wraps on
+  intercepted methods, unwrap() escape hatch - __version__ now derived from package metadata (was
+  frozen at 1.0.0) - cli: cache-lens run exits 2 with guidance instead of raising
+  NotImplementedError; classifier moved to Beta - semantic-release changelog switched to update mode
+  with insertion flag so released sections stop being regenerated/dropped
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+
 ## v1.0.5 (2026-06-10)
 
 ### Bug Fixes
