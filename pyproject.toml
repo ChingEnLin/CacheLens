@@ -67,6 +67,11 @@ branch = "main"
 commit_parser = "conventional"
 major_on_zero = false
 
+# Push with the checked-out SSH remote (deploy key) instead of rewriting the
+# push URL with the API token — the main ruleset only exempts deploy keys.
+[tool.semantic_release.remote]
+ignore_token_for_push = true
+
 [tool.semantic_release.changelog]
 changelog_file = "CHANGELOG.md"
 # "update" inserts new versions at the insertion flag instead of regenerating
