@@ -115,3 +115,56 @@ def test_gemini_no_cache_tip():
              model="gemini-2.5-flash", provider="gemini")
     ])
     assert any("Gemini context cache" in t for t in report.tips)
+
+
+def test_latency_percentiles():
+    caps = [_cap([], read=0, created=0, miss=100, out=10, ts=i) for i in range(1, 4)]
+    report = analyze(caps)  # every fixture call reports latency_ms=100
+    assert report.latency_p50_ms == 100
+    assert report.latency_p95_ms == 100
+
+
+def test_skipped_calls_reported_with_tip():
+    report = analyze([], skipped_calls=3)
+    assert report.skipped_calls == 3
+    assert any("not instrumented" in t for t in report.tips)
+
+
+def test_skipped_calls_tip_alongside_captures():
+    report = analyze(
+        [_cap([], read=0, created=0, miss=100, out=10, ts=1)], skipped_calls=2
+    )
+    assert report.skipped_calls == 2
+    assert any("not instrumented" in t for t in report.tips)
+
+
+def test_mixed_models_listed_and_flagged():
+    caps = [
+        _cap([], read=0, created=0, miss=100, out=10, ts=1, model="claude-sonnet-4-6"),
+        _cap([], read=0, created=0, miss=100, out=10, ts=2, model="claude-haiku-4-5"),
+    ]
+    report = analyze(caps)
+    assert report.models == ["claude-sonnet-4-6", "claude-haiku-4-5"]
+    assert any("mixed" in t.lower() for t in report.tips)
+
+
+def test_content_free_segments_classify_identically():
+    """Hash+length capture must yield the same layer split as full text."""
+    def calls(transform):
+        system = _seg("system", "S" * 100)
+        context = _seg("user", "C" * 300)
+        return [
+            _cap([transform(system), transform(context),
+                  transform(_seg("user", "first question"))],
+                 read=0, created=0, miss=4000, out=50, ts=1),
+            _cap([transform(system), transform(context),
+                  transform(_seg("user", "a different second question entirely"))],
+                 read=0, created=0, miss=4200, out=60, ts=2),
+        ]
+
+    full = analyze(calls(lambda s: s))
+    stripped = analyze(calls(lambda s: s.without_text()))
+
+    assert [(layer.name, layer.total_tokens) for layer in full.layers] == [
+        (layer.name, layer.total_tokens) for layer in stripped.layers
+    ]

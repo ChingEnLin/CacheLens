@@ -14,8 +14,11 @@ def render(report: SessionReport) -> None:
         return
 
     console = Console()
+    model_label = report.model
+    if len(report.models) > 1:
+        model_label = f"{report.model} (+{len(report.models) - 1} more)"
     header = (
-        f"cache-lens  ·  {report.provider}  ·  {report.model}  ·  "
+        f"cache-lens  ·  {report.provider}  ·  {model_label}  ·  "
         f"{report.total_turns} turns"
     )
     console.print(f"[bold]{header}[/bold]")
@@ -47,6 +50,14 @@ def render(report: SessionReport) -> None:
     console.print(
         f"Ceiling              ${report.theoretical_max_savings_usd:.4f}  (max if fully cached)"
     )
+    if report.total_calls:
+        console.print(
+            f"Latency p50 / p95    {report.latency_p50_ms} ms / {report.latency_p95_ms} ms"
+        )
+    if report.skipped_calls:
+        console.print(
+            f"[yellow]Skipped calls        {report.skipped_calls}  (not instrumented)[/yellow]"
+        )
 
     if report.tips:
         console.print("[bold]Tips[/bold]")
@@ -63,5 +74,7 @@ def _render_plain(report: SessionReport) -> None:
         )
     print(f"  Actual ${report.actual_cost_usd:.4f}  Cold ${report.cold_cost_usd:.4f}  "
           f"Saved ${report.total_savings_usd:.4f}")
+    if report.skipped_calls:
+        print(f"  Skipped calls: {report.skipped_calls} (not instrumented)")
     for tip in report.tips:
         print(f"  -> {tip}")

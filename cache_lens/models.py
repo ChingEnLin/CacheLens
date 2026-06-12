@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Literal
@@ -28,10 +29,27 @@ class RawCallMetrics:
 
 @dataclass
 class PromptSegment:
-    """One ordered piece of a request prompt, in prefix order."""
+    """One ordered piece of a request prompt, in prefix order.
+
+    The analyzer only needs segment *equality* (role + content hash) and
+    *length* (char-share token estimation), so ``text`` may be empty when
+    content capture is off — ``text_hash`` and ``length`` are always set.
+    """
 
     role: str          # "system", "user", "assistant", "model", "tool", ...
-    text: str
+    text: str = ""
+    text_hash: str = ""
+    length: int = 0
+
+    def __post_init__(self) -> None:
+        if self.text and not self.text_hash:
+            self.text_hash = hashlib.sha256(self.text.encode("utf-8")).hexdigest()
+        if self.text and not self.length:
+            self.length = len(self.text)
+
+    def without_text(self) -> "PromptSegment":
+        """A copy carrying only role, hash, and length — no prompt content."""
+        return PromptSegment(role=self.role, text="", text_hash=self.text_hash, length=self.length)
 
 
 @dataclass
@@ -73,3 +91,7 @@ class SessionReport:
     total_savings_usd: float = 0.0
     theoretical_max_savings_usd: float = 0.0
     tips: List[str] = field(default_factory=list)
+    models: List[str] = field(default_factory=list)  # distinct models seen, in order
+    skipped_calls: int = 0  # intercepted but not instrumentable (async/streaming)
+    latency_p50_ms: int = 0
+    latency_p95_ms: int = 0

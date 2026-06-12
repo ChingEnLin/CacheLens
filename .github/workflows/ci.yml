@@ -27,3 +27,42 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e .[dev]
+
+      - name: Ruff
+        run: ruff check cache_lens tests
+
+      - name: Mypy
+        run: mypy cache_lens
+
+  # Install every extra at its declared *minimum* version so floor drift
+  # (e.g. an API the SDK only gained later) fails CI instead of users.
+  min-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install minimum declared versions
+        run: |
+          pip install -e .[dev]
+          pip install "rich==13.0.0" \
+            "opentelemetry-sdk==1.23.0" \
+            "opentelemetry-exporter-otlp-proto-grpc==1.23.0"
+
+      - name: Run tests
+        run: pytest

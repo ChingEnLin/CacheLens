@@ -60,6 +60,29 @@ Or point at a file process-wide with `CACHE_LENS_PRICING=/path/to/pricing.json`.
 A bad pricing file falls back to defaults rather than breaking the run. See
 [docs/architecture.md](docs/architecture.md) for the full design.
 
+A `pricing=` argument applies to that wrapped client's session only — two
+clients with different overrides don't leak into each other. For a
+process-wide override use the env var or `cache_lens.pricing.load(...)`.
+
+## Privacy & what gets captured
+
+CacheLens never sends your prompts anywhere. By default it doesn't even keep
+them: each request segment is reduced to *(role, SHA-256 hash, length)* at
+capture time — enough for prefix diffing and layer attribution — so memory
+stays bounded and no prompt content lingers in the process heap. Reports
+(terminal, JSON, OTEL) contain only aggregates: token counts, costs, hit
+rates, and tips. Pass `capture_content=True` to `wrap()` / `CacheLens` to
+retain full text for your own inspection.
+
+Async clients (`AsyncAnthropic`, `AsyncOpenAI`, `generate_content_async`) are
+instrumented like sync ones. Streaming calls (`stream=True`,
+`messages.stream`) are **not** instrumented yet — they are counted and shown
+as "skipped" in the report, so missing tokens are visible rather than silently
+under-counted.
+
+The wrapper is a proxy: `isinstance(wrapped, anthropic.Anthropic)` is False.
+Call `wrapped.unwrap()` to reach the original client where identity matters.
+
 ## How this helps you develop LLM applications
 
 Prompt caching only pays off if your prompt's prefix is stable and
@@ -91,13 +114,17 @@ walkthrough of this loop on a 30-turn Gemini agent.
 
 ## Status
 
-v1.0. Implemented: wrapper interception with **request capture**, provider
-extraction + capture (Anthropic + Gemini + OpenAI), **content-based layer
+v1.1. Implemented: wrapper interception (sync **and async**) with **request
+capture** (content-free by default — hash + length only), provider extraction
++ capture (Anthropic + Gemini + OpenAI), **content-based layer
 classification** (longest-common-prefix → named system_prompt / context /
 conversation layers, cross-referenced against actual cache reads),
-terminal/JSON/OTEL outputs, overridable pricing, tests.
-Pending: `cache-lens run` CLI injection, streaming support, and cross-run
-static/semi-static separation (see [docs/architecture.md](docs/architecture.md)).
+terminal/JSON/OTEL outputs, per-session overridable pricing, latency
+percentiles, skipped-call accounting, tests.
+Pending: streaming usage extraction (currently counted as skipped),
+`cache-lens run` CLI injection, and cross-run static/semi-static separation
+(see [docs/architecture.md](docs/architecture.md) and
+[docs/improvement-plan.md](docs/improvement-plan.md)).
 
 ## Develop
 

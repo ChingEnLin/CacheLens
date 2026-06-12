@@ -63,18 +63,23 @@ _LITELLM_FIELDS = {
 }
 
 
-def get_pricing(provider: str, model: str) -> Optional[Rates]:
-    """Look up pricing for a (provider, model). Falls back to longest prefix match."""
-    _ensure_env_loaded()
-    exact = PRICING.get((provider, model))
+def _lookup(table: Mapping[Key, Rates], provider: str, model: str) -> Optional[Rates]:
+    """Exact (provider, model) lookup, falling back to longest prefix match."""
+    exact = table.get((provider, model))
     if exact is not None:
         return exact
     best_len = -1
     best_price = None
-    for (prov, mdl), price in PRICING.items():
+    for (prov, mdl), price in table.items():
         if prov == provider and model.startswith(mdl) and len(mdl) > best_len:
             best_len, best_price = len(mdl), price
     return best_price
+
+
+def get_pricing(provider: str, model: str) -> Optional[Rates]:
+    """Look up pricing for a (provider, model). Falls back to longest prefix match."""
+    _ensure_env_loaded()
+    return _lookup(PRICING, provider, model)
 
 
 def rate(provider: str, model: str, kind: str) -> float:
@@ -83,6 +88,37 @@ def rate(provider: str, model: str, kind: str) -> float:
     if price is None:
         return 0.0
     return price.get(kind, 0.0) / _PER_TOKEN
+
+
+class Registry:
+    """An isolated pricing table for one session.
+
+    Snapshots the process-wide registry (defaults + ``CACHE_LENS_PRICING`` env
+    overrides) at construction, then applies session-local overrides on top —
+    so two wrapped clients with different ``pricing=`` args don't leak into
+    each other or into the module-level table.
+    """
+
+    def __init__(self, base: Optional[Mapping[Key, Rates]] = None):
+        if base is None:
+            _ensure_env_loaded()
+            base = PRICING
+        self.table: Dict[Key, Rates] = dict(base)
+
+    def load(self, source: Union[str, Mapping], *, merge: bool = True) -> None:
+        parsed = parse(source)
+        if not merge:
+            self.table.clear()
+        self.table.update(parsed)
+
+    def get_pricing(self, provider: str, model: str) -> Optional[Rates]:
+        return _lookup(self.table, provider, model)
+
+    def rate(self, provider: str, model: str, kind: str) -> float:
+        price = self.get_pricing(provider, model)
+        if price is None:
+            return 0.0
+        return price.get(kind, 0.0) / _PER_TOKEN
 
 
 def reset() -> None:
@@ -168,7 +204,7 @@ def _parse_litellm(data: Mapping) -> Dict[Key, Rates]:
     for raw_model, entry in data.items():
         if not isinstance(entry, Mapping):
             continue
-        provider = entry.get("litellm_provider")
+        provider = str(entry.get("litellm_provider") or "")
         if not provider:
             continue
         prov = _PROVIDER_ALIASES.get(provider, provider)

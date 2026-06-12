@@ -12,7 +12,7 @@ license = { text = "MIT" }
 authors = [{ name = "Ching En Lin", email = "chingenlin71@gmail.com" }]
 keywords = ["llm", "prompt-caching", "anthropic", "gemini", "observability", "otel"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -31,18 +31,19 @@ dependencies = [
 anthropic = ["anthropic>=0.40"]
 gemini = ["google-generativeai>=0.8"]
 openai = ["openai>=1.40"]
+# opentelemetry >=1.23 is required for synchronous Gauge (Meter.create_gauge).
 otel = [
-    "opentelemetry-sdk>=1.20",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
+    "opentelemetry-sdk>=1.23",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.23",
 ]
 all = [
     "anthropic>=0.40",
     "google-generativeai>=0.8",
     "openai>=1.40",
-    "opentelemetry-sdk>=1.20",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
+    "opentelemetry-sdk>=1.23",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.23",
 ]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "ruff>=0.4", "mypy>=1.8"]
 
 [project.scripts]
 cache-lens = "cache_lens.cli:main"
@@ -68,3 +69,15 @@ major_on_zero = false
 
 [tool.semantic_release.changelog]
 changelog_file = "CHANGELOG.md"
+# "update" inserts new versions at the insertion flag instead of regenerating
+# the whole file — earlier hand-written sections are preserved verbatim.
+mode = "update"
+insertion_flag = "<!-- version list -->"
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.mypy]
+ignore_missing_imports = true
+warn_unused_ignores = true
