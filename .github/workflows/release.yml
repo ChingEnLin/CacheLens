@@ -47,6 +47,10 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          # Push the version-bump commit over SSH with the release deploy key:
+          # the main ruleset requires PRs but exempts deploy keys, so the bot
+          # can release while humans still go through pull requests.
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
           persist-credentials: true
 
       - name: Python Semantic Release
